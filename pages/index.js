@@ -1,5 +1,5 @@
-import {useState, useEffect} from "react";
-import {ethers} from "ethers";
+import { useState, useEffect } from "react";
+import { ethers } from "ethers";
 import atm_abi from "../artifacts/contracts/Assessment.sol/Assessment.json";
 
 export default function HomePage() {
@@ -7,41 +7,44 @@ export default function HomePage() {
   const [account, setAccount] = useState(undefined);
   const [atm, setATM] = useState(undefined);
   const [balance, setBalance] = useState(undefined);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showEStatement, setShowEStatement] = useState(false);
+  const [eStatement, setEStatement] = useState([]);
 
   const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const atmABI = atm_abi.abi;
 
-  const getWallet = async() => {
+  const getWallet = async () => {
     if (window.ethereum) {
       setEthWallet(window.ethereum);
     }
 
     if (ethWallet) {
-      const account = await ethWallet.request({method: "eth_accounts"});
-      handleAccount(account);
+      const accounts = await ethWallet.request({ method: "eth_accounts" });
+      handleAccount(accounts);
     }
-  }
+  };
 
-  const handleAccount = (account) => {
+  const handleAccount = (accounts) => {
+    const account = accounts[0];
     if (account) {
-      console.log ("Account connected: ", account);
+      console.log("Account connected: ", account);
       setAccount(account);
-    }
-    else {
+    } else {
       console.log("No account found");
     }
-  }
+  };
 
-  const connectAccount = async() => {
+  const connectAccount = async () => {
     if (!ethWallet) {
-      alert('MetaMask wallet is required to connect');
+      alert("MetaMask wallet is required to connect");
       return;
     }
-  
-    const accounts = await ethWallet.request({ method: 'eth_requestAccounts' });
+
+    const accounts = await ethWallet.request({ method: "eth_requestAccounts" });
     handleAccount(accounts);
-    
-    // once wallet is set we can get a reference to our deployed contract
+
+    // Once the wallet is set, we can get a reference to our deployed contract
     getATMContract();
   };
 
@@ -49,44 +52,72 @@ export default function HomePage() {
     const provider = new ethers.providers.Web3Provider(ethWallet);
     const signer = provider.getSigner();
     const atmContract = new ethers.Contract(contractAddress, atmABI, signer);
- 
-    setATM(atmContract);
-  }
 
-  const getBalance = async() => {
+    setATM(atmContract);
+  };
+
+  const getBalance = async () => {
     if (atm) {
       setBalance((await atm.getBalance()).toNumber());
     }
-  }
+  };
 
-  const deposit = async() => {
+  const deposit = async () => {
     if (atm) {
       let tx = await atm.deposit(1);
-      await tx.wait()
+      await tx.wait();
       getBalance();
+      updateEStatement("Deposit", 1);
     }
-  }
+  };
 
-  const withdraw = async() => {
+  const withdraw = async () => {
     if (atm) {
       let tx = await atm.withdraw(1);
-      await tx.wait()
+      await tx.wait();
       getBalance();
+      updateEStatement("Withdrawal", -1);
     }
-  }
+  };
+
+  const updateEStatement = (type, amount) => {
+    const transaction = {
+      type,
+      amount,
+      dateTime: new Date().toLocaleString(),
+    };
+    setEStatement([...eStatement, transaction]);
+  };
+
+  const disconnectWallet = async () => {
+    if (ethWallet) {
+      try {
+        await ethWallet.request({
+          method: 'wallet_requestPermissions',
+          params: [{ eth_accounts: {} }],
+        });
+        setAccount(undefined);
+        setBalance(undefined);
+        setATM(undefined);
+        setEStatement([]);
+      } catch (error) {
+        console.error('Error disconnecting wallet:', error);
+      }
+    }
+  };
 
   const initUser = () => {
-    // Check to see if user has Metamask
+    // Check to see if the user has Metamask
     if (!ethWallet) {
-      return <p>Please install Metamask in order to use this ATM.</p>
+      return <p>Please install Metamask to use this ATM.</p>;
     }
 
-    // Check to see if user is connected. If not, connect to their account
+    // Check to see if the user is connected. If not, connect to their account
     if (!account) {
-      return <button onClick={connectAccount}>Please connect your Metamask wallet</button>
+      return <button onClick={connectAccount}>Connect Metamask Wallet</button>;
     }
 
-    if (balance == undefined) {
+    if (balance === undefined) {
       getBalance();
     }
 
@@ -94,25 +125,71 @@ export default function HomePage() {
       <div>
         <p>Your Account: {account}</p>
         <p>Your Balance: {balance}</p>
-        <button onClick={deposit}>Deposit 1 ETH</button>
-        <button onClick={withdraw}>Withdraw 1 ETH</button>
+        {showMenu && (
+          <div className="menuButtons">
+            <button onClick={deposit}>Deposit 1 ETH</button>
+            <button onClick={withdraw}>Withdraw 1 ETH</button>
+            <button onClick={() => setShowEStatement(true)}>E-Statement</button>
+          </div>
+        )}
+        <button onClick={() => setShowMenu(!showMenu)}>Menu</button>
       </div>
-    )
-  }
+    );
+  };
 
-  useEffect(() => {getWallet();}, []);
+  const renderEStatement = () => {
+    return (
+      <div className="eStatement">
+        <h2>E-Statement</h2>
+        {eStatement.map((transaction, index) => (
+          <div key={index} className="transaction">
+            <p>Type: {transaction.type}</p>
+            <p>Amount: {transaction.amount} ETH</p>
+            <p>Date and Time: {transaction.dateTime}</p>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    getWallet();
+  }, []);
 
   return (
     <main className="container">
-      <header><h1>Welcome to the Metacrafters ATM!</h1></header>
+      <header>
+        <h1>Welcome to the Metacrafters ATM!</h1>
+      </header>
       {initUser()}
+      {showEStatement && renderEStatement()}
+      {account && <button onClick={disconnectWallet}>Exit</button>}
       <style jsx>{`
         .container {
-          text-align: center
+          text-align: center;
         }
-      `}
-      </style>
-    </main>
-  )
-}
 
+        .menuButtons {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .menuButtons button {
+          margin: 10px;
+          padding: 15px;
+          font-size: large;
+        }
+
+        .eStatement {
+          margin-top: 20px;
+        }
+
+        .transaction {
+          border: 1px solid #ccc;
+          padding: 10px;
+          margin-bottom: 10px;
+        }
+      `}</style>
+    </main>
+  );
+}
