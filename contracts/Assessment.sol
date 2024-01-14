@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-//import "hardhat/console.sol";
-
 contract Assessment {
     address payable public owner;
     uint256 public balance;
+    mapping(address => uint256) public investments;
 
     event Deposit(uint256 amount);
     event Withdraw(uint256 amount);
+    event Swap(address indexed fromCurrency, address indexed toCurrency, uint256 amount);
+    event AutoInvest(uint256 amount);
+    event SellUSDT(uint256 amount);
 
     constructor(uint initBalance) payable {
         owner = payable(msg.sender);
@@ -19,79 +21,50 @@ contract Assessment {
         return balance;
     }
 
+    error InsufficientBalance(uint256 balance, uint256 withdrawAmount);
+
     function deposit(uint256 _amount) public payable {
-        uint256 _previousBalance = balance;
-
-        // make sure this is the owner
         require(msg.sender == owner, "You are not the owner of this account");
-
-        // perform transaction
         balance += _amount;
-
-        // assert transaction completed successfully
-        assert(balance == _previousBalance + _amount);
-
-        // emit the event
         emit Deposit(_amount);
     }
 
-    // custom error
-    error InsufficientBalance(uint256 balance, uint256 withdrawAmount);
-
     function withdraw(uint256 _withdrawAmount) public {
         require(msg.sender == owner, "You are not the owner of this account");
-        uint256 _previousBalance = balance;
         if (balance < _withdrawAmount) {
-            revert
-                InsufficientBalance({
-                    balance: balance,
-                    withdrawAmount: _withdrawAmount
-                });
+            revert InsufficientBalance(balance, _withdrawAmount);
         }
-
-        // withdraw the given amount
         balance -= _withdrawAmount;
-
-        // assert the balance is correct
-        assert(balance == (_previousBalance - _withdrawAmount));
-
-        // emit the event
         emit Withdraw(_withdrawAmount);
     }
 
-    // Trigonometric function - Sine
-function sin(uint256 _angleInDegrees) public pure returns (int256) {
-    // Convert degrees to radians
-    int256 angleInRadians = (int256(_angleInDegrees) * int256(314159)) / int256(180000);
+    function swapCurrency(address _fromCurrency, address _toCurrency, uint256 _amount) public {
+        require(msg.sender == owner, "You are not the owner of this account");
+        require(_fromCurrency != _toCurrency, "Cannot swap the same currency");
+        require(balance >= _amount, "Insufficient balance for swapping");
 
-    // Calculate sine using a basic series expansion
-    int256 result = angleInRadians;
-    int256 term = angleInRadians;
+        balance -= _amount;
+        balance += _amount;
 
-    for (uint256 i = 1; i <= 10; i++) {
-        term = (term * angleInRadians * angleInRadians) / int256((2 * i) * (2 * i + 1));
-        if (i % 2 == 0) {
-            result += term;
-        } else {
-            result -= term;
-        }
+        emit Swap(_fromCurrency, _toCurrency, _amount);
     }
 
-    return result;
-}
+    function autoInvest() public {
+        require(msg.sender == owner, "You are not the owner of this account");
+        require(balance > 0, "No balance available for auto-investing");
 
+        investments[msg.sender] += balance;
+        balance = 0;
 
-    // Exponential function
-    function exp(uint256 _power) public pure returns (uint256) {
-        // Calculate e^x using a basic series expansion
-        uint256 result = 1;
-        uint256 term = 1;
+        emit AutoInvest(balance);
+    }
 
-        for (uint256 i = 1; i <= 10; i++) {
-            term = (term * _power) / i;
-            result += term;
-        }
+    function sellUSDT(uint256 _amount) public {
+        require(msg.sender == owner, "You are not the owner of this account");
+        require(balance >= _amount, "Insufficient USDT balance for selling");
 
-        return result;
+        balance -= _amount;
+
+        emit SellUSDT(_amount);
     }
 }
