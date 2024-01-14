@@ -10,6 +10,7 @@ export default function HomePage() {
   const [showMenu, setShowMenu] = useState(false);
   const [showEStatement, setShowEStatement] = useState(false);
   const [eStatement, setEStatement] = useState([]);
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const atmABI = atm_abi.abi;
@@ -44,7 +45,6 @@ export default function HomePage() {
     const accounts = await ethWallet.request({ method: "eth_requestAccounts" });
     handleAccount(accounts);
 
-    // Once the wallet is set, we can get a reference to our deployed contract
     getATMContract();
   };
 
@@ -107,12 +107,10 @@ export default function HomePage() {
   };
 
   const initUser = () => {
-    // Check to see if the user has Metamask
     if (!ethWallet) {
       return <p>Please install Metamask to use this ATM.</p>;
     }
 
-    // Check to see if the user is connected. If not, connect to their account
     if (!account) {
       return <button onClick={connectAccount}>Connect Metamask Wallet</button>;
     }
@@ -154,6 +152,11 @@ export default function HomePage() {
 
   useEffect(() => {
     getWallet();
+    const intervalId = setInterval(() => {
+      setCurrentDate(new Date());
+    }, 1000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   return (
@@ -161,12 +164,27 @@ export default function HomePage() {
       <header>
         <h1>Welcome to the Metacrafters ATM!</h1>
       </header>
+
+      <div className="blue-background">
+        <p>Current Date and Time: {currentDate.toLocaleString()}</p>
+        <p>Holder Name: Nitish</p>
+        <p>Age: 20</p>
+        <p>Email Address: pendulct@gmail.com</p>
+      </div>
+
       {initUser()}
       {showEStatement && renderEStatement()}
       {account && <button onClick={disconnectWallet}>Exit</button>}
       <style jsx>{`
         .container {
           text-align: center;
+        }
+
+        .blue-background {
+          background-color: #3498db;
+          padding: 10px;
+          color: white;
+          text-align: left;
         }
 
         .menuButtons {
